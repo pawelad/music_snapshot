@@ -7,7 +7,7 @@ name = "music_snapshot"
 description = "Saving a snapshot of your day as a Spotify playlist."
 authors = [{name = "Paweł Adamczak", email = "pawel.ad@gmail.com"}]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 keywords = ["spotify", "playlist", "cli"]
 classifiers = [
@@ -18,7 +18,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -60,7 +59,7 @@ Issues = "https://github.com/pawelad/music_snapshot/issues"
 music_snapshot = "music_snapshot.__main__:main"
 
 [tool.black]
-target-version = ["py38"]
+target-version = ["py310"]
 
 [tool.interrogate]
 ignore-init-module = true
@@ -72,17 +71,19 @@ profile = "black"
 src_paths = ["src"]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
 module = [
   "click_default_group",
+  "pylast",
+  "spotipy",
 ]
 ignore_missing_imports = true
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [
@@ -120,3 +121,6 @@ convention = "google"
 
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = true
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20

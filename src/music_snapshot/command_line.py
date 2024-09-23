@@ -1,7 +1,7 @@
-"""music_snapshot command line interface."""
+"""Click based command line interface."""
 
 import dataclasses
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 import click
@@ -9,12 +9,24 @@ import pylast
 import questionary
 import rich_click
 import spotipy
+from click import ClickException
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.progress import track
+from rich.progress import track as rich_progress_bar
+from spotipy import SpotifyException
 
 from music_snapshot.config import MusicSnapshotConfig
-from music_snapshot.utils import DefaultRichGroup, validate_date, validate_time
+from music_snapshot.tracks import guess_end_track, lastfm_track_to_spotify, select_track
+from music_snapshot.utils import (
+    DATETIME_FORMAT,
+    TIME_FORMAT,
+    DefaultRichGroup,
+    chunks,
+    validate_date,
+    validate_time,
+)
+
+UTC = timezone.utc  # Python 3.11
 
 MUSIC_SNAPSHOT_CONFIG_PATH = Path.home() / ".music_snapshot"
 SPOTIPY_CACHE_PATH = Path.home() / ".spotipy"
@@ -147,7 +159,6 @@ def authorize(
 ) -> None:
     """TODO: Docstrings."""
     # Spotify
-    rich_console.print("Authorize Spotify")
     spotify_client = spotipy.Spotify(
         auth_manager=spotipy.SpotifyOAuth(
             client_id=spotify_client_id,
@@ -173,6 +184,7 @@ def authorize(
     lastfm_user = lastfm_api.get_user(lastfm_username)
     lastfm_user.get_name(True)
 
+    # Save config to disk
     config = MusicSnapshotConfig(
         # Spotipy has its own caching logic, but doesn't actually save the `client_id`,
         # `client_secret` and `redirect_uri` values there, even though it *does*
@@ -202,6 +214,7 @@ def create(obj: MusicSnapshotContext) -> None:
     """TODO: Docstrings."""
     now = datetime.now(UTC)
     today = now.date()
+    page_size = 10
 
     # Start date
     message = "Select snapshot start date:"
@@ -242,16 +255,16 @@ def create(obj: MusicSnapshotContext) -> None:
     if start_datetime >= now:
         raise click.ClickException("Start date can't be in the future.")
 
-    # Select first song
-    lastfm_user = obj.lastfm_api.get_user(obj.config.lastfm_username)
+    # Get song candidates from Last.fm history
+    time_from = int(start_datetime.timestamp())
+    # For some reason, nothing is returned without the `time_to` parameter set
+    time_to = int((start_datetime + timedelta(days=2)).timestamp())
 
-    # Without the `time_to` parameter set, the API seemed to default to now...
-    # (which of course isn't mentioned anywhere in the API docs)
-    end_datetime = start_datetime + timedelta(days=5)
+    lastfm_user = obj.lastfm_api.get_user(obj.config.lastfm_username)
     song_candidates = lastfm_user.get_recent_tracks(
         limit=500,
-        time_from=int(start_datetime.timestamp()),
-        time_to=int(end_datetime.timestamp()),
+        time_from=time_from,
+        time_to=time_to,
     )
     # Even though we use the `from` filtering, the song list is still 'newest first'
     song_candidates.reverse()
@@ -259,213 +272,139 @@ def create(obj: MusicSnapshotContext) -> None:
     if len(song_candidates) == 0:
         raise click.ClickException("No song candidates found.")
 
-    page = 0
-    page_size = 10
-    first_song = None
-    first_song_n = None
-    while True:
-        song_choices = []
-        for n, played_track in enumerate(
-            song_candidates[page * page_size : (page + 1) * page_size],
-            start=page * page_size,
-        ):
-            played_at = datetime.fromtimestamp(int(played_track.timestamp), UTC)
-            played_at = played_at.astimezone()  # Local timezone
-            track_name = played_track.track.get_name()
-            artist = played_track.track.get_artist().get_name()
-            album = played_track.album
+    # Select first track
+    selected_first_track = select_track(
+        tracks=song_candidates,
+        page_size=page_size,
+        select_message="Select first song:",
+    )
+    if not selected_first_track:
+        raise click.ClickException("You need to select the first track.")
 
-            title = [
-                ("class:date", played_at.strftime("%Y-%m-%d")),
-                ("", " "),
-                ("class:time", played_at.strftime("%H:%M")),
-                ("", " | "),
-                ("class:track", track_name),
-                ("", " by "),
-                ("class:artist", artist),
-                ("", " from "),
-                ("class:album", album),
-            ]
-            song_choice = questionary.Choice(title, (n, played_track))
-            song_choices.append(song_choice)
+    first_song_n, first_song = (
+        selected_first_track["n"],
+        selected_first_track["played_track"],
+    )
 
-        if page > 0:
-            song_choices = ["Previous"] + song_choices
-
-        if (page + 1) * page_size < len(song_candidates):
-            song_choices = song_choices + ["Next"]
-
-        message = "Select first song:"
-        selected_song = questionary.select(
-            message,
-            song_choices,
-            style=QUESTIONARY_STYLE,
-        ).ask()
-
-        if selected_song == "Previous":
-            page -= 1
-            continue
-        elif selected_song == "Next":
-            page += 1
-            continue
-        elif selected_song is None:
-            break
-        else:
-            first_song_n, first_song = selected_song
-            break
-
-    if first_song is None or first_song_n is None:
-        raise click.ClickException("You need to select the first song.")
-
-    # Try to guess the end song
-    guess_last_song = None
-    guess_last_song_n = page
-    for n, played_track in enumerate(
-        song_candidates[first_song_n:],
-        start=first_song_n,
-    ):
-        track_played_at = datetime.fromtimestamp(int(played_track.timestamp), UTC)
-
-        try:
-            next_track = song_candidates[n + 1]
-        except KeyError:
-            break
-
-        next_track_played_at = datetime.fromtimestamp(int(next_track.timestamp), UTC)
-
-        # If the difference between two songs is more then 60 minutes, the earlier
-        # one could be the end song. We could also involve track duration into the
-        # math, but this is easier for now.
-        if (next_track_played_at - track_played_at) > timedelta(minutes=60):
-            guess_last_song = (n, played_track)
-            guess_last_song_n = n
-            break
+    # Try to guess the end track
+    guessed_track = guess_end_track(
+        tracks=song_candidates,
+        first_track_n=first_song_n,
+    )
 
     # Select last song (while trying to default to the guessed value)
-    page = int(guess_last_song_n / page_size)
-    last_song = None
-    last_song_n = None
-    while True:
-        song_choices = []
-        for n, played_track in enumerate(
-            song_candidates[page * page_size : (page + 1) * page_size],
-            start=page * page_size,
-        ):
-            played_at = datetime.fromtimestamp(int(played_track.timestamp), UTC)
-            played_at = played_at.astimezone()  # Local timezone
-            track_name = played_track.track.get_name()
-            artist = played_track.track.get_artist().get_name()
-            album = played_track.album
+    page = int(guessed_track["n"] / page_size) if guessed_track else 0
+    default_choice = guessed_track if guessed_track else None
+    selected_last_track = select_track(
+        tracks=song_candidates,
+        default_choice=dict(default_choice) if default_choice else None,  # For mypy
+        page=page,
+        page_size=page_size,
+        select_message="Select last song:",
+    )
+    if not selected_last_track:
+        raise click.ClickException("You need to select the last track.")
 
-            title = [
-                ("class:date", played_at.strftime("%Y-%m-%d")),
-                ("", " "),
-                ("class:time", played_at.strftime("%H:%M")),
-                ("", " | "),
-                ("class:track", track_name),
-                ("", " by "),
-                ("class:artist", artist),
-                ("", " from "),
-                ("class:album", album),
-            ]
-            song_choice = questionary.Choice(title, (n, played_track))
-            song_choices.append(song_choice)
+    last_song_n, last_song = (
+        selected_last_track["n"],
+        selected_last_track["played_track"],
+    )
 
-        if page > 0:
-            song_choices = ["Previous"] + song_choices
-
-        if (page + 1) * page_size < len(song_candidates):
-            song_choices = song_choices + ["Next"]
-
-        message = "Select last song:"
-        selected_song = questionary.select(
-            message,
-            song_choices,
-            default=guess_last_song,
-            style=QUESTIONARY_STYLE,
-        ).ask()
-
-        if selected_song == "Previous":
-            page -= 1
-            guess_last_song = None
-            continue
-        elif selected_song == "Next":
-            page += 1
-            guess_last_song = None
-            continue
-        elif selected_song is None:
-            break
-        else:
-            last_song_n, last_song = selected_song
-            break
-
-    if last_song is None or last_song_n is None:
-        raise click.ClickException("You need to select a last song.")
-
-    # Playlist name
+    # Some validation
     first_song_played_at = datetime.fromtimestamp(int(first_song.timestamp), UTC)
     first_song_played_at = first_song_played_at.astimezone()  # Local timezone
+    last_song_played_at = datetime.fromtimestamp(int(last_song.timestamp), UTC)
+    last_song_played_at = last_song_played_at.astimezone()  # Local timezone
+
+    if first_song_played_at >= last_song_played_at:
+        raise click.ClickException("First track needs to be before the last track.")
+
+    # Playlist name
+    default_name = first_song_played_at.date().isoformat()
 
     message = "Playlist name:"
-    default_name = first_song_played_at.date().isoformat()
     snapshot_name = questionary.text(message, default=default_name).ask()
 
     if snapshot_name is None:
         raise click.ClickException("You need to input playlist name.")
 
+    # Confirm action
+    song_count = last_song_n - first_song_n + 1
+    message = (
+        f"Do you want to create playlist '{snapshot_name}' and add {song_count} "
+        f"songs to it?"
+    )
+    create_playlist = questionary.confirm(message).ask()
+
+    if not create_playlist:
+        raise click.ClickException("The playlist was not created.")
+
     # Create playlist
     spotify_user = obj.spotify_api.me()
     spotify_user_id = spotify_user["id"]
+
+    songs_to_add = song_candidates[first_song_n : last_song_n + 1]
+
+    # For some reason, line breaks aren't supported in the playlist description
+    description = f"🎵 📸 | {first_song_played_at.strftime(DATETIME_FORMAT)} - "
+    if first_song_played_at.date() == last_song_played_at.date():
+        description += f"{last_song_played_at.strftime(TIME_FORMAT)}"
+    else:
+        description += f"{last_song_played_at.strftime(DATETIME_FORMAT)}"
 
     # Unfortunately, Spotify API doesn't allow creating truly private playlists
     # through the API. See:
     # - https://github.com/spotipy-dev/spotipy/issues/879
     # - https://community.spotify.com/t5/Spotify-for-Developers/Api-to-create-a-private-playlist-doesn-t-work/m-p/5407807#M5076
-    playlist = obj.spotify_api.user_playlist_create(
-        user=spotify_user_id,
-        name=snapshot_name,
-        description="🎵 📸",
-        public=False,
-    )
-    playlist_id = playlist["id"]
+    public = False
 
-    # Add songs to playlist
-    songs_to_add = []
-    for played_track in track(
-        song_candidates[first_song_n : last_song_n + 1],
-        console=rich_console,
-    ):
-        artist = played_track.track.get_artist().get_name()
-
-        track_name = played_track.track.get_name()
-        # Last.fm and Spotify naming conventions sometimes differ, so it's safer
-        # to remove some of the extra suffixes
-        for suffix in ["(ft", "(feat", "ft", "feat"]:
-            track_name = track_name.split(suffix)[0]
-
-        # Using `album:` for some reason doesn't work with singles
-        q = f"artist:{artist} track:{track_name}"
-        spotify_search_results = obj.spotify_api.search(q=q, limit=1, type="track")
-        results = spotify_search_results["tracks"]["items"]
-
-        # TODO: Error handling?
-        if len(results) == 0:
-            rich_console.print(f"Couldn't find a match for track: {track_name}")
-            rich_console.print(spotify_search_results)
-        else:
-            spotify_song = results[0]
-            spotify_song_id = spotify_song["id"]
-
-            songs_to_add.append(spotify_song_id)
-
-    obj.spotify_api.playlist_add_items(
-        playlist_id=playlist_id,
-        items=songs_to_add,
-    )
+    try:
+        playlist = obj.spotify_api.user_playlist_create(
+            user=spotify_user_id,
+            name=snapshot_name,
+            description=description,
+            public=public,
+        )
+    except SpotifyException as e:
+        raise ClickException(f"Error when creating the playlist:\n{e}") from e
 
     rich_console.print(
-        Markdown(
-            f"Successfully added {len(songs_to_add)} songs to `{snapshot_name}`.",
-            style="green",
-        )
+        f"> Successfully created '{snapshot_name}'.",
+        style="green",
     )
+
+    # Add songs to playlist
+    spotify_songs_to_add = []
+    for played_track in rich_progress_bar(
+        songs_to_add,
+        description="> Working...",
+        console=rich_console,
+    ):
+        try:
+            spotify_song = lastfm_track_to_spotify(
+                spotify_api=obj.spotify_api,
+                track=played_track.track,
+            )
+        except ValueError as e:
+            rich_console.print(f"> {e}", style="red")
+        else:
+            spotify_songs_to_add.append(spotify_song["id"])
+
+    songs_chunks = chunks(spotify_songs_to_add, n=75)
+    for song_chunk in songs_chunks:
+        obj.spotify_api.playlist_add_items(
+            playlist_id=playlist["id"],
+            items=song_chunk,
+        )
+
+    rich_console.print(
+        f"> Successfully added {len(spotify_songs_to_add)} songs to '{snapshot_name}'.",
+        style="bold green",
+    )
+
+    playlist_url = playlist.get("external_urls", {}).get("spotify")
+    if playlist_url:
+        rich_console.print(
+            f"> You can find it at: {playlist_url}",
+            style="bold cyan",
+        )

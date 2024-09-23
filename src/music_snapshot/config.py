@@ -1,4 +1,4 @@
-"""music_snapshot config related code."""
+"""Config related code."""
 
 import dataclasses
 import json
@@ -6,7 +6,6 @@ import os
 import sys
 from functools import partial
 from pathlib import Path
-from typing import Optional
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -16,7 +15,7 @@ else:
 
 @dataclasses.dataclass
 class MusicSnapshotConfig:
-    """music_snapshot config schema.
+    """Config schema for `music_snapshot`.
 
     Attributes:
         spotify_client_id: Spotify OAuth client ID.
@@ -28,17 +27,17 @@ class MusicSnapshotConfig:
     """
 
     # Spotify
-    spotify_client_id: Optional[str] = None
-    spotify_client_secret: Optional[str] = None
-    spotify_redirect_uri: Optional[str] = None
+    spotify_client_id: str | None = None
+    spotify_client_secret: str | None = None
+    spotify_redirect_uri: str | None = None
 
     # Last.fm
-    lastfm_api_key: Optional[str] = None
-    lastfm_api_secret: Optional[str] = None
-    lastfm_username: Optional[str] = None
+    lastfm_api_key: str | None = None
+    lastfm_api_secret: str | None = None
+    lastfm_username: str | None = None
 
     @classmethod
-    def load_from_disk(cls, config_path: Path) -> Self:
+    def load_from_disk(cls, config_path: Path | str) -> Self:
         """Load `music_snapshot` config from disk.
 
         Arguments:
@@ -52,7 +51,7 @@ class MusicSnapshotConfig:
 
         return cls(**config)
 
-    def save_to_disk(self, config_path: Path) -> None:
+    def save_to_disk(self, config_path: Path | str) -> None:
         """Save `music_snapshot` config to disk.
 
         Arguments:
