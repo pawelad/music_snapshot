@@ -1,6 +1,7 @@
 """Tracks (songs) related utils.
 
-I prefer 'song' terminology, but decided to follow `pylast` naming conventions.
+I prefer 'song' terminology, but decided to follow `pylast` naming conventions in
+Last.fm context, and 'song' in Spotify context.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -145,8 +146,8 @@ def guess_end_track(
 
         next_track_played_at = datetime.fromtimestamp(int(next_track.timestamp), UTC)
 
-        # If the difference between two songs is more then the threshold, the earlier
-        # one could be the end song. We could also involve track duration into the
+        # If the difference between two tracks is more then the threshold, the earlier
+        # one could be the end track. We could also involve track duration into the
         # math, but this is easier for now.
         if (next_track_played_at - track_played_at) > timedelta(minutes=threshold):
             guessed_track = EnumeratedTrack(n=n, played_track=played_track)

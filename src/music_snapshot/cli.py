@@ -255,72 +255,72 @@ def create(obj: MusicSnapshotContext) -> None:
     if start_datetime >= now:
         raise click.ClickException("Start date can't be in the future.")
 
-    # Get song candidates from Last.fm history
+    # Get track candidates from Last.fm history
     time_from = int(start_datetime.timestamp())
     # For some reason, nothing is returned without the `time_to` parameter set
     time_to = int((start_datetime + timedelta(days=2)).timestamp())
 
     lastfm_user = obj.lastfm_api.get_user(obj.config.lastfm_username)
-    song_candidates = lastfm_user.get_recent_tracks(
+    track_candidates = lastfm_user.get_recent_tracks(
         limit=500,
         time_from=time_from,
         time_to=time_to,
     )
-    # Even though we use the `from` filtering, the song list is still 'newest first'
-    song_candidates.reverse()
+    # Even though we use the `from` filtering, the track list is still 'newest first'
+    track_candidates.reverse()
 
-    if len(song_candidates) == 0:
+    if len(track_candidates) == 0:
         raise click.ClickException("No song candidates found.")
 
     # Select first track
     selected_first_track = select_track(
-        tracks=song_candidates,
+        tracks=track_candidates,
         page_size=page_size,
         select_message="Select first song:",
     )
     if not selected_first_track:
-        raise click.ClickException("You need to select the first track.")
+        raise click.ClickException("You need to select the first song.")
 
-    first_song_n, first_song = (
+    first_track_n, first_track = (
         selected_first_track["n"],
         selected_first_track["played_track"],
     )
 
     # Try to guess the end track
     guessed_track = guess_end_track(
-        tracks=song_candidates,
-        first_track_n=first_song_n,
+        tracks=track_candidates,
+        first_track_n=first_track_n,
     )
 
-    # Select last song (while trying to default to the guessed value)
+    # Select last track (while trying to default to the guessed value)
     page = int(guessed_track["n"] / page_size) if guessed_track else 0
     default_choice = guessed_track if guessed_track else None
     selected_last_track = select_track(
-        tracks=song_candidates,
+        tracks=track_candidates,
         default_choice=dict(default_choice) if default_choice else None,  # For mypy
         page=page,
         page_size=page_size,
         select_message="Select last song:",
     )
     if not selected_last_track:
-        raise click.ClickException("You need to select the last track.")
+        raise click.ClickException("You need to select the last song.")
 
-    last_song_n, last_song = (
+    last_track_n, last_track = (
         selected_last_track["n"],
         selected_last_track["played_track"],
     )
 
     # Some validation
-    first_song_played_at = datetime.fromtimestamp(int(first_song.timestamp), UTC)
-    first_song_played_at = first_song_played_at.astimezone()  # Local timezone
-    last_song_played_at = datetime.fromtimestamp(int(last_song.timestamp), UTC)
-    last_song_played_at = last_song_played_at.astimezone()  # Local timezone
+    first_track_played_at = datetime.fromtimestamp(int(first_track.timestamp), UTC)
+    first_track_played_at = first_track_played_at.astimezone()  # Local timezone
+    last_track_played_at = datetime.fromtimestamp(int(last_track.timestamp), UTC)
+    last_track_played_at = last_track_played_at.astimezone()  # Local timezone
 
-    if first_song_played_at >= last_song_played_at:
-        raise click.ClickException("First track needs to be before the last track.")
+    if first_track_played_at >= last_track_played_at:
+        raise click.ClickException("First song needs to be before the last song.")
 
     # Playlist name
-    default_name = first_song_played_at.date().isoformat()
+    default_name = first_track_played_at.date().isoformat()
 
     message = "Playlist name:"
     snapshot_name = questionary.text(message, default=default_name).ask()
@@ -329,9 +329,9 @@ def create(obj: MusicSnapshotContext) -> None:
         raise click.ClickException("You need to input playlist name.")
 
     # Confirm action
-    song_count = last_song_n - first_song_n + 1
+    track_count = last_track_n - first_track_n + 1
     message = (
-        f"Do you want to create playlist '{snapshot_name}' and add {song_count} "
+        f"Do you want to create playlist '{snapshot_name}' and add {track_count} "
         f"songs to it?"
     )
     create_playlist = questionary.confirm(message).ask()
@@ -343,14 +343,14 @@ def create(obj: MusicSnapshotContext) -> None:
     spotify_user = obj.spotify_api.me()
     spotify_user_id = spotify_user["id"]
 
-    songs_to_add = song_candidates[first_song_n : last_song_n + 1]
+    tracks_to_add = track_candidates[first_track_n : last_track_n + 1]
 
     # For some reason, line breaks aren't supported in the playlist description
-    description = f"🎵 📸 | {first_song_played_at.strftime(DATETIME_FORMAT)} - "
-    if first_song_played_at.date() == last_song_played_at.date():
-        description += f"{last_song_played_at.strftime(TIME_FORMAT)}"
+    description = f"🎵 📸 | {first_track_played_at.strftime(DATETIME_FORMAT)} - "
+    if first_track_played_at.date() == last_track_played_at.date():
+        description += f"{last_track_played_at.strftime(TIME_FORMAT)}"
     else:
-        description += f"{last_song_played_at.strftime(DATETIME_FORMAT)}"
+        description += f"{last_track_played_at.strftime(DATETIME_FORMAT)}"
 
     # Unfortunately, Spotify API doesn't allow creating truly private playlists
     # through the API. See:
@@ -373,10 +373,10 @@ def create(obj: MusicSnapshotContext) -> None:
         style="green",
     )
 
-    # Add songs to playlist
+    # Add tracks to playlist
     spotify_songs_to_add = []
     for played_track in rich_progress_bar(
-        songs_to_add,
+        tracks_to_add,
         description="> Working...",
         console=rich_console,
     ):
