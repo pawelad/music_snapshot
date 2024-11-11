@@ -2,7 +2,7 @@
 
 import sys
 
-from music_snapshot.command_line import cli
+from music_snapshot.cli import cli
 
 
 def main(args: list[str] | None = None) -> None:
