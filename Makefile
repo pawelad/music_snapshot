@@ -13,6 +13,10 @@ format: ## Format code
 	isort src/ tests/ noxfile.py
 	ruff check --fix src/ tests/ noxfile.py
 
+.PHONY: test
+test: ## Run the test suite
+	nox
+
 .PHONY: build
 build: ## Build package
 	python -m flit build
