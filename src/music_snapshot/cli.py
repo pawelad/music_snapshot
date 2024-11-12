@@ -1,6 +1,7 @@
 """Click based command line interface."""
 
 import dataclasses
+import os
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
@@ -119,6 +120,7 @@ def cli(ctx: click.Context) -> None:
     type=str,
     required=True,
     prompt="Spotify OAuth client ID",
+    default=lambda: os.environ.get("SPOTIPY_CLIENT_ID", ""),
     help="Spotify OAuth client ID.",
 )
 @click.option(
@@ -127,12 +129,17 @@ def cli(ctx: click.Context) -> None:
     required=True,
     prompt="Spotify OAuth client secret",
     hide_input=True,
+    default=lambda: os.environ.get("SPOTIPY_CLIENT_SECRET", ""),
     help="Spotify OAuth client secret.",
 )
 @click.option(
     "--spotify_redirect_uri",
     type=str,
-    default="http://localhost:6600/music_snapshot",
+    default=lambda: os.environ.get(
+        "SPOTIPY_REDIRECT_URI",
+        "http://localhost:6600/music_snapshot",
+    ),
+    show_default="http://localhost:6600/music_snapshot",
     help="Spotify redirect URI specified in OAuth client.",
 )
 @click.option(
@@ -140,6 +147,7 @@ def cli(ctx: click.Context) -> None:
     type=str,
     required=True,
     prompt="Last.fm API key",
+    default=lambda: os.environ.get("PYLAST_API_KEY", ""),
     help="Last.fm API key.",
 )
 @click.option(
@@ -148,6 +156,7 @@ def cli(ctx: click.Context) -> None:
     required=True,
     prompt="Last.fm API secret",
     hide_input=True,
+    default=lambda: os.environ.get("PYLAST_API_SECRET", ""),
     help="Last.fm API secret.",
 )
 @click.option(
@@ -155,6 +164,7 @@ def cli(ctx: click.Context) -> None:
     type=str,
     required=True,
     prompt="Last.fm username",
+    default=lambda: os.environ.get("PYLAST_USERNAME", ""),
     help="Last.fm username.",
 )
 def authorize(
