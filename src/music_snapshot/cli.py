@@ -28,21 +28,13 @@ from music_snapshot.utils import (
 
 UTC = timezone.utc  # Python 3.11
 
+# TODO: Make these configurable?
 MUSIC_SNAPSHOT_CONFIG_PATH = Path.home() / ".music_snapshot"
 SPOTIPY_CACHE_PATH = Path.home() / ".spotipy"
 SPOTIPY_SCOPES = [
     "playlist-modify-public",
     "playlist-modify-private",
 ]
-QUESTIONARY_STYLE = questionary.Style(
-    [
-        ("date", "fg:LightSkyBlue"),
-        ("time", "fg:LightGreen"),
-        ("track", "bold"),
-        ("artist", "fg:cyan italic"),
-        ("album", "fg:grey"),
-    ]
-)
 
 help_config = rich_click.RichHelpConfiguration(
     max_width=88,
@@ -54,7 +46,13 @@ rich_console = Console()
 
 @dataclasses.dataclass
 class MusicSnapshotContext:
-    """TODO: Docstrings."""
+    """App context schema.
+
+    Attributes:
+        config: Instance of `MusicSnapshotConfig`.
+        spotify_api: Instance of `spotipy` Spotify API client.
+        lastfm_api: Instance of `pylast` Last.fm API client.
+    """
 
     config: MusicSnapshotConfig
     spotify_api: spotipy.Spotify
@@ -66,7 +64,17 @@ class MusicSnapshotContext:
 @click.version_option()
 @click.pass_context
 def cli(ctx: click.Context) -> None:
-    """TODO: Docstrings."""
+    """Save a snapshot of your day as a Spotify playlist.
+
+    Because of Spotify API limitations (no accessible history of played songs) a
+    Last.fm account is required.
+
+    To use the app, you need to first create a new Spotify OAuth app in its
+    [developer dashboard](https://developer.spotify.com/dashboard) and get Last.fm
+    API keys by creating a [new API account](https://www.last.fm/api/account/create).
+    You can then use those values in the `authorize` subcommand, which will also
+    save the underlying data on your disk.
+    """
     if ctx.invoked_subcommand != "authorize":
         try:
             config = MusicSnapshotConfig.load_from_disk(MUSIC_SNAPSHOT_CONFIG_PATH)
@@ -157,7 +165,13 @@ def authorize(
     lastfm_api_secret: str,
     lastfm_username: str,
 ) -> None:
-    """TODO: Docstrings."""
+    """Authorize `music_snapshot` with Spotify and Last.fm.
+
+    To get Spotify client ID and secret, create an OAuth client in Spotify
+    [developer dashboard](https://developer.spotify.com/dashboard) (with the
+    "Redirect URI" set to `http://localhost:6600/music_snapshot`). To get Last.fm
+    API keys, create a [new API account](https://www.last.fm/api/account/create).
+    """
     # Spotify
     spotify_client = spotipy.Spotify(
         auth_manager=spotipy.SpotifyOAuth(
@@ -189,8 +203,8 @@ def authorize(
         # Spotipy has its own caching logic, but doesn't actually save the `client_id`,
         # `client_secret` and `redirect_uri` values there, even though it *does*
         # require them to initialize the API client (so you need to explicitly provide
-        # it each time). I feel like that would provide bad user experience, so I
-        # 'cache' them separately.
+        # them each time). I feel like that would provide bad user experience,
+        # so I 'cache' them separately.
         spotify_client_id=spotify_client_id,
         spotify_client_secret=spotify_client_secret,
         spotify_redirect_uri=spotify_redirect_uri,
@@ -211,7 +225,7 @@ def authorize(
 @cli.command()
 @click.pass_obj
 def create(obj: MusicSnapshotContext) -> None:
-    """TODO: Docstrings."""
+    """Create a music snapshot."""
     now = datetime.now(UTC)
     today = now.date()
     page_size = 10
@@ -297,9 +311,9 @@ def create(obj: MusicSnapshotContext) -> None:
     default_choice = guessed_track if guessed_track else None
     selected_last_track = select_track(
         tracks=track_candidates,
-        default_choice=dict(default_choice) if default_choice else None,  # For mypy
         page=page,
         page_size=page_size,
+        default_choice=dict(default_choice) if default_choice else None,  # For mypy
         select_message="Select last song:",
     )
     if not selected_last_track:

@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "music_snapshot"
-description = "Saving a snapshot of your day as a Spotify playlist."
+description = "Save a snapshot of your day as a Spotify playlist."
 authors = [{name = "Paweł Adamczak", email = "pawel.ad@gmail.com"}]
 readme = "README.md"
 requires-python = ">=3.10"

@@ -1,5 +1,5 @@
 # music_snapshot
-Saving a snapshot of your day as a Spotify playlist.
+Save a snapshot of your day as a Spotify playlist.
 
 🚧 Work In Progress 🚧
 

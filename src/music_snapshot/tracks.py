@@ -24,6 +24,7 @@ MUSIC_SNAPSHOT_QUESTIONARY_STYLE = questionary.Style(
         ("album", "fg:grey"),
     ]
 )
+"""Default `music_snapshot` questionary style."""
 
 
 class EnumeratedTrack(TypedDict):
@@ -41,8 +42,11 @@ class EnumeratedTrack(TypedDict):
 def get_played_track_title(played_track: pylast.PlayedTrack) -> list[tuple[str, str]]:
     """Create a (`questionary` compatible) nicely formatted title for a 'played track'.
 
-    Attributes:
+    Arguments:
         played_track: Played track to generate a title for.
+
+    Returns:
+        A `questionary` compatible title for passed 'played track'.
     """
     played_at = datetime.fromtimestamp(int(played_track.timestamp), UTC)
     played_at = played_at.astimezone()  # Local timezone
@@ -68,15 +72,31 @@ def get_played_track_title(played_track: pylast.PlayedTrack) -> list[tuple[str, 
 def select_track(
     tracks: list[pylast.PlayedTrack],
     *,
-    default_choice: dict[str, Any] | None = None,
     page: int = 0,
     page_size: int = 10,
+    default_choice: dict[str, Any] | None = None,
     style: questionary.Style = MUSIC_SNAPSHOT_QUESTIONARY_STYLE,
-    select_message: str = "Select track:",
+    select_message: str = "Select song:",
     previous_choice: questionary.Choice | None = None,
     next_choice: questionary.Choice | None = None,
 ) -> EnumeratedTrack | None:
-    """TODO: Docstrings."""
+    """Ask user to select a 'played track' from a paginated list.
+
+    It uses `questionary.select` in the background, but pagination is done manually.
+
+    Arguments:
+        tracks: List of 'played track' instances.
+        page: Page to show.
+        page_size: Page size.
+        default_choice: Default choice to preselect.
+        style: Instance of `questionary.Style` to use when formatting the choices.
+        select_message: Message to show when asking to select a track.
+        previous_choice: Previous choice value.
+        next_choice: Next choice value.
+
+    Returns:
+        Track selected by the user.
+    """
     if not previous_choice:
         previous_choice = questionary.Choice("Previous")
 
@@ -131,13 +151,23 @@ def guess_end_track(
     *,
     threshold: int = 60,
 ) -> EnumeratedTrack | None:
-    """TODO: Docstrings."""
+    """Try to guess the end track of the 'music snapshot'.
+
+    Arguments:
+        tracks: List of 'played track' instances.
+        first_track_n: First 'music snapshot' track.
+        threshold: Threshold (in minutes) to establish when the 'music snapshot'
+            might've ended.
+
+    Returns:
+        Guessed 'music snapshot' end track.
+    """
     guessed_track = None
     for n, played_track in enumerate(tracks[first_track_n:], start=first_track_n):
         track_played_at = datetime.fromtimestamp(int(played_track.timestamp), UTC)
 
-        # In case we traverse the whole list and don't find an end track, default
-        # to the last track
+        # In case we traverse the whole list and don't find an end track,
+        # default to the last track
         try:
             next_track = tracks[n + 1]
         except IndexError:
@@ -160,7 +190,18 @@ def lastfm_track_to_spotify(
     spotify_api: spotipy.Spotify,
     track: pylast.Track,
 ) -> dict:
-    """TODO: Docstrings."""
+    """Match passed Last.fm 'played track' to a Spotify song.
+
+    Arguments:
+        spotify_api: Instance of `spotipy` Spotify API client.
+        track: Instance of `pylast` track.
+
+    Raises:
+        ValueError: When the passed track couldn't be match to a Spotify song.
+
+    Returns:
+        A `TrackObject` dictionary from Spotify Web API.
+    """
     artist_name: str = track.get_artist().get_name()
 
     track_name: str = track.get_name()
