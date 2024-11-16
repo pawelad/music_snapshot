@@ -8,7 +8,7 @@
 
 Save a snapshot of your day as a Spotify playlist.
 
-<img></img>
+![Demo](./demo.gif)
 
 ## Installation
 Since `music_snapshot` is a command line tool, the recommended installation method
