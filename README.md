@@ -99,5 +99,6 @@ Released under [Mozilla Public License 2.0][license].
 [pep561]: https://peps.python.org/pep-0561/
 [pipx]: https://github.com/pypa/pipx
 [pypi music_snapshot]: https://pypi.org/project/music_snapshot/
+[pypi]: https://pypi.org/
 [spotify developer dashboard]: https://developer.spotify.com/dashboard
 [virtualenv]: https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/
