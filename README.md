@@ -8,7 +8,7 @@
 
 Save a snapshot of your day as a Spotify playlist.
 
-![Demo](./demo.gif)
+[![Demo](./demo.gif)][asciicast music_snapshot]
 
 ## Installation
 Since `music_snapshot` is a command line tool, the recommended installation method
@@ -88,6 +88,7 @@ If you'd like to contribute, please take a look at the
 Released under [Mozilla Public License 2.0][license].
 
 
+[asciicast music_snapshot]: https://asciinema.org/a/689879
 [black]: https://github.com/psf/black
 [codecov music_snapshot]: https://app.codecov.io/github/pawelad/music_snapshot
 [contributing guide]: ./CONTRIBUTING.md
