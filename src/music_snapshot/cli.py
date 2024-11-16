@@ -2,6 +2,7 @@
 
 import dataclasses
 import os
+import sys
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
@@ -83,6 +84,9 @@ def cli(ctx: click.Context) -> None:
     You can then use those values in the `authorize` subcommand, which will also
     save the underlying data on your disk.
     """
+    if "--help" in sys.argv[1:]:
+        return
+
     if ctx.invoked_subcommand != "authorize":
         try:
             config = MusicSnapshotConfig.load_from_disk(MUSIC_SNAPSHOT_CONFIG_PATH)
