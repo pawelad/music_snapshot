@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## Unreleased
 
+
+## [v0.1.0](https://github.com/pawelad/music_snapshot/releases/tag/v0.1.0) - 2024-11-16
 ### Added
 - Initial release
 
