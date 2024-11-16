@@ -8,7 +8,7 @@
 
 Save a snapshot of your day as a Spotify playlist.
 
-[![Demo](./demo.gif)][asciicast music_snapshot]
+[![Demo](https://cdn.jsdelivr.net/gh/pawelad/music_snapshot/demo.gif)][asciicast music_snapshot]
 
 ## Installation
 Since `music_snapshot` is a command line tool, the recommended installation method
