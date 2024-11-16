@@ -67,8 +67,15 @@ class MusicSnapshotContext:
 def cli(ctx: click.Context) -> None:
     """Save a snapshot of your day as a Spotify playlist.
 
-    Because of Spotify API limitations (no accessible history of played songs) a
-    Last.fm account is required.
+    Have you ever just let Spotify algorithm do its thing, keep going long after
+    your queue has finished and ended in a place you'd like to go back to? I'm here
+    to help you do just that.
+
+    A 'music snapshot' is a Spotify playlist that encapsulates a part of your music
+    playing history.
+
+    Unfortunately, because of Spotify API limitations (no accessible history of
+    played songs) the song history comes from your Last.fm account.
 
     To use the app, you need to first create a new Spotify OAuth app in its
     [developer dashboard](https://developer.spotify.com/dashboard) and get Last.fm
@@ -235,7 +242,11 @@ def authorize(
 @cli.command()
 @click.pass_obj
 def create(obj: MusicSnapshotContext) -> None:
-    """Create a music snapshot."""
+    """Create a new music snapshot (Spotify playlist).
+
+    A 'music snapshot' is a Spotify playlist that encapsulates a part of your music
+    playing history.
+    """
     now = datetime.now(UTC)
     today = now.date()
     page_size = 10
