@@ -1,4 +1,4 @@
-"""Click based command line interface."""
+"""Click based `music_snapshot` command line interface."""
 
 import dataclasses
 import os
