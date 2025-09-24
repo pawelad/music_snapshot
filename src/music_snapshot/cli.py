@@ -19,6 +19,7 @@ from spotipy import SpotifyException
 
 from music_snapshot.config import MusicSnapshotConfig
 from music_snapshot.tracks import guess_end_track, lastfm_track_to_spotify, select_track
+from nicegui import ui
 from music_snapshot.utils import (
     DATETIME_FORMAT,
     TIME_FORMAT,
@@ -87,7 +88,7 @@ def cli(ctx: click.Context) -> None:
     if "--help" in sys.argv[1:]:
         return
 
-    if ctx.invoked_subcommand != "authorize":
+    if ctx.invoked_subcommand not in ["authorize", "web"]:
         try:
             config = MusicSnapshotConfig.load_from_disk(MUSIC_SNAPSHOT_CONFIG_PATH)
         except FileNotFoundError:
@@ -123,6 +124,18 @@ def cli(ctx: click.Context) -> None:
             spotify_api=spotify_api,
             lastfm_api=lastfm_api,
         )
+
+
+@cli.command()
+def web() -> None:
+    """Run the `music_snapshot` GUI."""
+    # I need to import the gui module to register the page
+    from . import gui
+    ui.run(
+        title="Music Snapshot",
+        dark=True,
+        reload=False,
+    )
 
 
 @cli.command()

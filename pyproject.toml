@@ -34,6 +34,10 @@ dependencies = [
   "rich-click",
   "spotipy",
   "typing_extensions; python_version < '3.11'",
+  "nicegui",
+  "PySide6",
+  "pywebview",
+  "qtpy",
 ]
 
 [project.optional-dependencies]
