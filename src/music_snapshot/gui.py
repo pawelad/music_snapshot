@@ -167,8 +167,10 @@ def main_page():
                     gui_tracks = []
                     for played_track in track_candidates:
                         track = played_track.track
-                        cover_url = track.get_cover_image()
-                        if not cover_url:
+
+                        try:
+                            cover_url = track.get_cover_image(size=pylast.SIZE_MEDIUM)
+                        except IndexError:
                             cover_url = "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
 
                         gui_tracks.append(GuiTrack(
