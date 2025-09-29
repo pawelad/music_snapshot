@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 from datetime import datetime, time, timedelta
 import pylast
 import spotipy
@@ -6,6 +7,8 @@ from nicegui import app, ui
 from .config import MusicSnapshotConfig
 from .cli import MUSIC_SNAPSHOT_CONFIG_PATH, SPOTIPY_SCOPES, SPOTIPY_CACHE_PATH
 from .tracks import lastfm_track_to_spotify
+
+logger = logging.getLogger()
 
 @dataclasses.dataclass
 class GuiTrack:
@@ -183,6 +186,7 @@ def main_page():
 
                 except Exception as e:
                     ui.notify(f"Error loading tracks: {e}", color="negative")
+                    logger.exception("Error loading tracks")
 
             with ui.row().classes('w-full justify-end'):
                 ui.button('Load tracks', on_click=load_tracks)
