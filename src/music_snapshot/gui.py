@@ -15,7 +15,6 @@ class GuiTrack:
     album: str
     cover_url: str
     played_at: str
-    played_track: pylast.PlayedTrack
 
 @ui.page('/')
 def main_page():
@@ -100,7 +99,25 @@ def main_page():
                 with start_time.add_slot('append'):
                     ui.icon('access_time').on('click', menu.open).classes('cursor-pointer')
 
+            track_grid = ui.grid(columns=2).classes('w-full')
+
+            def update_track_grid():
+                track_grid.clear()
+                with track_grid:
+                    for track in app.storage.user.get('tracks', []):
+                        with ui.card().on('click', lambda track=track: handle_track_click(track)):
+                            ui.image(track.cover_url).classes('w-full')
+                            with ui.card_section():
+                                ui.label(track.name).classes('text-subtitle2')
+                                ui.label(track.artist).classes('text-caption')
+                                ui.label(track.album).classes('text-caption')
+                                ui.label(track.played_at).classes('text-caption')
+
             async def load_tracks():
+                if not start_date.value or not start_time.value:
+                    ui.notify("Please select a start date and time.", color="negative")
+                    return
+
                 try:
                     config = MusicSnapshotConfig.load_from_disk(MUSIC_SNAPSHOT_CONFIG_PATH)
                 except FileNotFoundError:
@@ -127,10 +144,6 @@ def main_page():
                     ui.notify(f"Error initializing API clients: {e}", color="negative")
                     return
 
-                if not start_date.value or not start_time.value:
-                    ui.notify("Please select a start date and time.", color="negative")
-                    return
-
                 try:
                     start_datetime = datetime.combine(datetime.fromisoformat(start_date.value).date(), time.fromisoformat(start_time.value))
                     time_from = int(start_datetime.timestamp())
@@ -149,7 +162,6 @@ def main_page():
                         track = played_track.track
                         cover_url = track.get_cover_image()
                         if not cover_url:
-                            # Use a placeholder image if no cover art is available
                             cover_url = "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
 
                         gui_tracks.append(GuiTrack(
@@ -158,12 +170,12 @@ def main_page():
                             album=played_track.album,
                             cover_url=cover_url,
                             played_at=datetime.fromtimestamp(int(played_track.timestamp)).strftime("%Y-%m-%d %H:%M:%S"),
-                            played_track=played_track,
                         ))
 
+                    app.storage.user['track_candidates'] = track_candidates
                     app.storage.user['tracks'] = gui_tracks
                     ui.notify(f"Loaded {len(gui_tracks)} tracks.", color="positive")
-                    app.storage.user['update_track_grid']()
+                    update_track_grid()
 
                 except Exception as e:
                     ui.notify(f"Error loading tracks: {e}", color="negative")
@@ -172,31 +184,11 @@ def main_page():
                 ui.button('Load tracks', on_click=load_tracks)
 
         with ui.card().classes('w-full'):
-            ui.label("Select first track").classes('text-h5')
-            track_grid = ui.grid(columns=2).classes('w-full')
+            ui.label("Select Tracks").classes('text-h5')
 
-            def update_track_grid():
-                track_grid.clear()
-                with track_grid:
-                    for track in app.storage.user.get('tracks', []):
-                        with ui.card().on('click', lambda track=track: handle_track_click(track)):
-                            ui.image(track.cover_url).classes('w-full')
-                            with ui.card_section():
-                                ui.label(track.name).classes('text-subtitle2')
-                                ui.label(track.artist).classes('text-caption')
-                                ui.label(track.album).classes('text-caption')
-                                ui.label(track.played_at).classes('text-caption')
-
-            app.storage.user['update_track_grid'] = update_track_grid
-
-        app.storage.user['selecting_start_track'] = True
-        app.storage.user['start_track'] = None
-        app.storage.user['end_track'] = None
-
-        with ui.card().classes('w-full'):
-            ui.label("Selection").classes('text-h5')
-            start_track_label = ui.label("Start track: ")
-            end_track_label = ui.label("End track: ")
+            with ui.row():
+                start_track_label = ui.label("Start track: ")
+                end_track_label = ui.label("End track: ")
 
             def clear_selection():
                 app.storage.user['start_track'] = None
@@ -207,6 +199,10 @@ def main_page():
                 ui.notify("Selection cleared.")
 
             ui.button("Clear Selection", on_click=clear_selection)
+
+        app.storage.user['selecting_start_track'] = True
+        app.storage.user['start_track'] = None
+        app.storage.user['end_track'] = None
 
         def handle_track_click(track: GuiTrack):
             if app.storage.user['selecting_start_track']:
@@ -257,7 +253,22 @@ def main_page():
                         ui.notify("Start track must be before end track.", color="negative")
                         return
 
-                    tracks_to_add = tracks[start_index : end_index + 1]
+                    track_candidates = app.storage.user.get('track_candidates', [])
+                    start_played_track = next((t for t in track_candidates if t.track.get_name() == start_track.name and t.track.get_artist().get_name() == start_track.artist), None)
+                    end_played_track = next((t for t in track_candidates if t.track.get_name() == end_track.name and t.track.get_artist().get_name() == end_track.artist), None)
+
+                    if not start_played_track or not end_played_track:
+                        ui.notify("Could not find selected tracks in the original list.", color="negative")
+                        return
+
+                    start_index = track_candidates.index(start_played_track)
+                    end_index = track_candidates.index(end_played_track)
+
+                    if start_index > end_index:
+                        ui.notify("Start track must be before end track.", color="negative")
+                        return
+
+                    tracks_to_add = track_candidates[start_index : end_index + 1]
 
                     spotify_user = spotify_api.me()
                     spotify_user_id = spotify_user["id"]
@@ -269,11 +280,11 @@ def main_page():
                     )
 
                     spotify_songs_to_add = []
-                    for track in tracks_to_add:
+                    for played_track in tracks_to_add:
                         try:
                             spotify_song = lastfm_track_to_spotify(
                                 spotify_api=spotify_api,
-                                track=track.played_track.track,
+                                track=played_track.track,
                             )
                             spotify_songs_to_add.append(spotify_song["id"])
                         except ValueError as e:
@@ -291,4 +302,3 @@ def main_page():
 
             create_playlist_button = ui.button("Create Playlist", on_click=create_playlist)
             create_playlist_button.bind_enabled_from(app.storage.user, 'start_track', lambda val: val is not None and app.storage.user.get('end_track') is not None)
-            create_playlist_button.bind_enabled_from(app.storage.user, 'end_track', lambda val: val is not None and app.storage.user.get('start_track') is not None)

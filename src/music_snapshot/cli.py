@@ -2,6 +2,7 @@
 
 import dataclasses
 import os
+import secrets
 import sys
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -135,6 +136,7 @@ def web() -> None:
         title="Music Snapshot",
         dark=True,
         reload=False,
+        storage_secret=secrets.token_hex(16),
     )
 
 

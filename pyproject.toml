@@ -34,19 +34,21 @@ dependencies = [
   "rich-click",
   "spotipy",
   "typing_extensions; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+gui = [
   "nicegui",
   "PySide6",
   "pywebview",
   "qtpy",
 ]
-
-[project.optional-dependencies]
 tests = [
   "coverage[toml]",
   "pytest",
 ]
 dev = [
-  "music_snapshot[tests]",
+  "music_snapshot[tests,gui]",
   # Code style
   "black",
   "interrogate",
