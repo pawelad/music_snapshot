@@ -157,6 +157,10 @@ def main_page():
                     )
                     track_candidates.reverse()
 
+                    if not track_candidates:
+                        ui.notify("No tracks found for the selected date and time.", color="warning")
+                        return
+
                     gui_tracks = []
                     for played_track in track_candidates:
                         track = played_track.track
@@ -254,20 +258,6 @@ def main_page():
                         return
 
                     track_candidates = app.storage.user.get('track_candidates', [])
-                    start_played_track = next((t for t in track_candidates if t.track.get_name() == start_track.name and t.track.get_artist().get_name() == start_track.artist), None)
-                    end_played_track = next((t for t in track_candidates if t.track.get_name() == end_track.name and t.track.get_artist().get_name() == end_track.artist), None)
-
-                    if not start_played_track or not end_played_track:
-                        ui.notify("Could not find selected tracks in the original list.", color="negative")
-                        return
-
-                    start_index = track_candidates.index(start_played_track)
-                    end_index = track_candidates.index(end_played_track)
-
-                    if start_index > end_index:
-                        ui.notify("Start track must be before end track.", color="negative")
-                        return
-
                     tracks_to_add = track_candidates[start_index : end_index + 1]
 
                     spotify_user = spotify_api.me()
